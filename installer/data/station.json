@@ -1,0 +1,13 @@
+{
+ "stream": {
+  "url": "http://as-hls-ww-live.akamaized.net/pool_62063831/live/ww/bbc_radio_one_dance/bbc_radio_one_dance.isml/bbc_radio_one_dance-audio%3d320000.norewind.m3u8",
+  "service": "bbc_radio_one_dance",
+  "note": "url: the BBC's own worldwide HLS stream (320 kb/s AAC, 6.4 s segments, no encryption). service: the id of the BBC's now-playing feed, rms.api.bbc.co.uk/v2/services/<service>/segments/latest. The installer writes both into <azimuth>/Radio1Dance/stream.ini, which the DLL reads."
+ },
+ "live": {
+  "sounds": ["R1D_Live_A", "R1D_Live_B"],
+  "display_name": "Live",
+  "artist": "BBC Radio 1 Dance",
+  "note": "two 16-minute tracks that the DLL serves as the live stream; two so the radio always has a next track to pick"
+ }
+}

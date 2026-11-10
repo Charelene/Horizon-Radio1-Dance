@@ -1,0 +1,122 @@
+name: Release
+
+# Push a tag like v1.0.1 (git tag v1.0.1 && git push origin v1.0.1) to build and publish a release.
+# "Run workflow" in the Actions tab builds everything too, and publishes it when you give a version.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, e.g. 1.0.1 (leave empty to only test the build)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build DLL and installers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mingw-w64 and the Windows Rust target
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64
+          rustup toolchain install stable --profile minimal --target x86_64-pc-windows-gnu
+          rustup default stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: installer
+
+      - name: Build
+        run: ./installer/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: installer/dist/*
+          if-no-files-found: error
+
+  wizard:
+    name: Build the Windows setup wizard
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: installer/dist
+
+      - name: Work out the version
+        id: ver
+        shell: bash
+        run: |
+          v="${{ github.event.inputs.version || github.ref_name }}"
+          v="${v#v}"
+          case "$v" in ""|main|master) v="0.0.0" ;; esac
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Install Inno Setup if the runner lacks it
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue) -and -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      - name: Compile the wizard
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc -Q "/DAppVersion=${{ steps.ver.outputs.version }}" installer\windows\radio1-dance.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wizard
+          path: installer/dist/BBCRadio1Dance-Setup.exe
+          if-no-files-found: error
+
+  release:
+    name: Publish the GitHub release
+    needs: [build, wizard]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: release
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: wizard
+          path: release
+
+      - name: Add checksums
+        run: |
+          cd release
+          rm -f SHA256SUMS
+          sha256sum r1d-installer-* BBCRadio1Dance-Setup* > SHA256SUMS
+          ls -l
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.event.inputs.version) }}"
+          gh release create "$tag" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "BBC Radio 1 Dance $tag" \
+            --generate-notes
