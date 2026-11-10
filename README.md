@@ -107,7 +107,7 @@ python tools/make_icon.py assets/logo.png installer/data/HUD_RadioIcon_R1Dance.s
 GitHub Actions ([`release.yml`](.github/workflows/release.yml)) builds and publishes a release when a version tag is pushed: `BBCRadio1Dance-Setup.exe`, `r1d-installer-linux-x86_64`, `install.sh` and `SHA256SUMS`.
 
 ```sh
-git tag v0.1.0 && git push origin v0.1.0
+git tag v1.0.0 && git push origin v1.0.0
 ```
 
 ## Layout

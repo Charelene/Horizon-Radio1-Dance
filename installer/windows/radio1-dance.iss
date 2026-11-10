@@ -5,7 +5,7 @@
 
 #define AppName "BBC Radio 1 Dance"
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "1.0.0"
 #endif
 #define Engine "r1d-installer.exe"
 

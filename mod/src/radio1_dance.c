@@ -33,7 +33,7 @@
 #define LIVE_PREFIX "R1D_Live"             /* SoundName prefix of the live tracks */
 #define SILENT_PREFIX "R1D_Silent"         /* SoundName prefix of the silent stinger / DJ placeholders */
 #define MOD_FOLDER L"Radio1Dance"          /* under <azimuth> */
-#define MOD_VERSION "0.1.0"
+#define MOD_VERSION "1.0.0"
 
 static const char DEFAULT_URL[] = "http://as-hls-ww-live.akamaized.net/pool_62063831/live/ww/bbc_radio_one_dance/"
                                   "bbc_radio_one_dance.isml/bbc_radio_one_dance-audio%3d320000.norewind.m3u8";
