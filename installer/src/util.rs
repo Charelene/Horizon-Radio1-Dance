@@ -37,8 +37,30 @@ pub fn assume_yes(on: bool) {
     ASSUME_YES.store(on, Ordering::Relaxed);
 }
 
+/// Whether a question with a default answer can be put to someone: there is a keyboard, and --yes was not given.
+pub fn can_ask() -> bool {
+    !ASSUME_YES.load(Ordering::Relaxed) && io::stdin().is_terminal()
+}
+
+/// True when this process has its console to itself: it was started by a double-click, so the window goes away the
+/// moment the process ends, taking whatever was printed with it. From a terminal the shell shares the console.
+#[cfg(windows)]
+pub fn own_console() -> bool {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetConsoleProcessList(list: *mut u32, count: u32) -> u32;
+    }
+    let mut pids = [0u32; 2];
+    unsafe { GetConsoleProcessList(pids.as_mut_ptr(), 2) == 1 }
+}
+
+#[cfg(not(windows))]
+pub fn own_console() -> bool {
+    false
+}
+
 pub fn ask_yes_no(question: &str, default: bool) -> bool {
-    if ASSUME_YES.load(Ordering::Relaxed) || !io::stdin().is_terminal() {
+    if !can_ask() {
         return default;
     }
     loop {

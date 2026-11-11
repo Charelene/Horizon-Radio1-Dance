@@ -18,6 +18,9 @@ AppPublisher=BBC Radio 1 Dance for Forza Horizon 2 (fan mod)
 DefaultDirName={autopf}\Azimuth
 AppendDefaultDirName=no
 DirExistsWarning=no
+; always ask: by default the folder page is skipped once the mod has been installed, and a wrong or moved Azimuth
+; folder could then never be changed
+DisableDirPage=no
 DisableProgramGroupPage=yes
 UninstallFilesDir={app}\Radio1Dance
 UninstallDisplayName={#AppName} for Forza Horizon 2
@@ -46,42 +49,78 @@ Filename: "{app}\Radio1Dance\{#Engine}"; Parameters: "--azimuth ""{app}"" --unin
 Type: filesandordirs; Name: "{app}\Radio1Dance"
 
 [Code]
+function HasAzimuth(Dir: String): Boolean;
+begin
+  Result := (Dir <> '') and FileExists(AddBackslash(Dir) + 'azimuth.exe');
+end;
+
+{ Azimuth in Place or in one of its subfolders. Its zip unpacks as "azimuth-windows" and people rename it, so the
+  folder's name says nothing. }
+function AzimuthIn(Place: String): String;
+var
+  Rec: TFindRec;
+begin
+  Result := '';
+  if HasAzimuth(Place) then
+    Result := Place
+  else if FindFirst(AddBackslash(Place) + '*', Rec) then
+  begin
+    try
+      repeat
+        if (Rec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0) and (Rec.Name <> '.') and (Rec.Name <> '..') then
+          if HasAzimuth(AddBackslash(Place) + Rec.Name) then
+            Result := AddBackslash(Place) + Rec.Name;
+      until (Result <> '') or not FindNext(Rec);
+    finally
+      FindClose(Rec);
+    end;
+  end;
+end;
+
 function FindAzimuth(): String;
 var
   Home: String;
 begin
   Home := ExpandConstant('{%USERPROFILE}');
-  Result := '';
-  if FileExists(ExpandConstant('{src}\azimuth.exe')) then
-    Result := ExpandConstant('{src}')
-  else if FileExists(Home + '\Games\Azimuth\azimuth.exe') then
-    Result := Home + '\Games\Azimuth'
-  else if FileExists(Home + '\Downloads\Azimuth\azimuth.exe') then
-    Result := Home + '\Downloads\Azimuth'
-  else if FileExists(Home + '\Desktop\Azimuth\azimuth.exe') then
-    Result := Home + '\Desktop\Azimuth'
-  else if FileExists(Home + '\Documents\Azimuth\azimuth.exe') then
-    Result := Home + '\Documents\Azimuth';
+  Result := AzimuthIn(ExpandConstant('{src}'));
+  if Result = '' then Result := AzimuthIn(Home + '\Games');
+  if Result = '' then Result := AzimuthIn(Home + '\Downloads');
+  if Result = '' then Result := AzimuthIn(Home + '\Desktop');
+  if Result = '' then Result := AzimuthIn(Home + '\Documents');
+  if Result = '' then Result := AzimuthIn(Home);
+  if Result = '' then Result := AzimuthIn(ExpandConstant('{sd}\Games'));
 end;
 
 procedure InitializeWizard();
 var
   Found: String;
 begin
-  Found := FindAzimuth();
-  if (Found <> '') and (WizardForm.PrevAppDir = '') then
-    WizardForm.DirEdit.Text := Found;
+  { the folder of an earlier install stays while Azimuth is still in it; otherwise offer the one found }
+  if not HasAzimuth(WizardForm.PrevAppDir) then
+  begin
+    Found := FindAzimuth();
+    if Found <> '' then
+      WizardForm.DirEdit.Text := Found;
+  end;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  Dir: String;
 begin
   Result := True;
   if CurPageID = wpSelectDir then
-    if not FileExists(AddBackslash(WizardDirValue) + 'azimuth.exe') then
+  begin
+    { the path to azimuth.exe itself is as good as its folder }
+    Dir := RemoveBackslashUnlessRoot(Trim(WizardForm.DirEdit.Text));
+    if (CompareText(ExtractFileName(Dir), 'azimuth.exe') = 0) and FileExists(Dir) then
+      WizardForm.DirEdit.Text := ExtractFileDir(Dir);
+    if not HasAzimuth(WizardDirValue) then
     begin
       MsgBox('There is no azimuth.exe in that folder. Choose the folder Azimuth is installed in.', mbError, MB_OK);
       Result := False;
     end;
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

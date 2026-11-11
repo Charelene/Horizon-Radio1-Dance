@@ -13,10 +13,10 @@ const HELP: &str = "BBC Radio 1 Dance installer for Forza Horizon 2 (Azimuth)
 
 usage: r1d-installer [options]
   --azimuth <dir>    the Azimuth folder (the one with azimuth.exe)
-  --game <dir>       the Forza Horizon 2 folder holding media/ (found from Azimuth's settings by default)
+  --game <dir>       your Forza Horizon 2 folder (found from Azimuth's settings by default)
   --uninstall        remove the mod and everything it installed
-  --pause-on-error   wait for Enter after an error (for when it runs in its own window)
-  -y, --yes          do not ask questions
+  --pause-on-error   wait for Enter after an error (for when something else runs it in its own window)
+  -y, --yes          take the default answer to every question
 ";
 
 #[derive(Default)]
@@ -49,10 +49,18 @@ fn parse_args() -> Result<Args> {
 }
 
 fn main() {
-    let args = match parse_args() {
+    let parsed = parse_args();
+    // Double-clicked, the installer is alone in a console window that closes with it: keep the window open until
+    // the outcome has been read. Not with --yes: then something else runs it (the setup wizard, hidden when it
+    // uninstalls) and nobody is there to press Enter.
+    let own_window = util::own_console() && util::can_ask();
+    let args = match parsed {
         Ok(a) => a,
         Err(e) => {
             eprintln!("{e}");
+            if own_window {
+                util::wait_for_enter();
+            }
             std::process::exit(2);
         }
     };
@@ -60,12 +68,12 @@ fn main() {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("\nerror: {e}");
-            if args.pause {
-                util::wait_for_enter();
-            }
             1
         }
     };
+    if own_window || (code != 0 && args.pause) {
+        util::wait_for_enter();
+    }
     std::process::exit(code);
 }
 
